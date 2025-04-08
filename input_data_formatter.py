@@ -158,3 +158,5 @@ for ix in range(ncolx):
             #output[ix*ncoly*ncolz + iy*ncolz + iz, 6] = spincur[0, 0, 0, iz, iy, ix] + spincur[1, 0, 0, iz, iy, ix] # this is wrong
 
 np.savetxt ( output_file , output , header = ' '.join(col_names) ) #, fmt = '%1.4e' )
+
+print('Job Done!')

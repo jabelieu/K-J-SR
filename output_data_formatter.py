@@ -32,3 +32,5 @@ for ix in range(dim):
 col_names = ['Spin Up 0', 'Spin Down 0', 'Spin Up 1', 'Spin Down 1']
 
 np.savetxt ( output_file , output , header = ' '.join(col_names) ) #, fmt = '%1.4e' )
+
+print('Job Done!')
