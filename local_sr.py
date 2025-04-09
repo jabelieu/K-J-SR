@@ -85,6 +85,8 @@ dlocal0 = out_df['Spin_Up_0'].to_numpy()
 '                            REGRESSOR INSTANCE                                '
 #-------------------------------------------------------------------------------
 
+print('Running PySR...')
+
 model = srp.PySRRegressor ( binary_operators = opl , unary_operators = uopl ,
                             niterations = niterations ,batching = batching ,
                             populations = populations ,

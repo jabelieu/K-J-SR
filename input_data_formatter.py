@@ -3,6 +3,8 @@ import numpy as np
 input_file = 'rlambda_48X48Y48Z.dat'
 output_file = 'rlambda_48X48Y48Z.txt'
 
+print('Fomatting input file...')
+
 def read_binary ( input_file ) :
 
     """

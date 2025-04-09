@@ -3,6 +3,8 @@ import numpy as np
 input_file = 'dlocal_48X48Y48Z.dat'
 output_file = 'dlocal_48X48Y48Z.txt'
 
+print('Fomatting output file...')
+
 dim = 48
 
 
