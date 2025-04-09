@@ -55,6 +55,7 @@ batching = True
 inp_df = pd.read_csv(input_file,skiprows=0,sep=' ')
 with open(input_file, 'r') as file:
     first_line = file.readline()
+    first_line.replace('# ','')
 inp_df.columns = first_line.split()
 
 out_df = pd.read_csv(output_file,skiprows=0,sep=' ')
