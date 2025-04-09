@@ -1,7 +1,13 @@
 import numpy as np
 
-input_file = 'dlocal_48X48Y48Z.dat'
-output_file = 'dlocal_48X48Y48Z.txt'
+read_file = 'data_file_names.txt'
+
+with open ( read_file , 'r' ) as f :
+
+    first_line = f.readline().split()
+
+    input_file = first_line[2]
+    output_file = first_line[3]
 
 print('Fomatting output file...')
 
@@ -31,8 +37,8 @@ for ix in range(dim):
             output[ix*dim*dim + iy*dim + iz, 2] = out[1,0, iz, iy, ix]
             output[ix*dim*dim + iy*dim + iz, 3] = out[1,1, iz, iy, ix]
 
-col_names = ['Spin Up 0', 'Spin Down 0', 'Spin Up 1', 'Spin Down 1']
+col_names = ['Spin_Up_0', 'Spin_Down_0', 'Spin_Up_1', 'Spin_Down_1']
 
 np.savetxt ( output_file , output , header = ' '.join(col_names) ) #, fmt = '%1.4e' )
 
-print('Job Done!')
+print('Output file formatting complete!')

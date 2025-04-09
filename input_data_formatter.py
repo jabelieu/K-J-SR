@@ -1,7 +1,14 @@
 import numpy as np
 
-input_file = 'rlambda_48X48Y48Z.dat'
-output_file = 'rlambda_48X48Y48Z.txt'
+
+read_file = 'data_file_names.txt'
+
+with open ( read_file , 'r' ) as f :
+
+    first_line = f.readline().split()
+
+    input_file = first_line[0]
+    output_file = first_line[1]
 
 print('Fomatting input file...')
 
@@ -161,4 +168,4 @@ for ix in range(ncolx):
 
 np.savetxt ( output_file , output , header = ' '.join(col_names) ) #, fmt = '%1.4e' )
 
-print('Job Done!')
+print('Input file formatting complete!')
