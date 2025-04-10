@@ -50,8 +50,11 @@ formatted_now = now.strftime("%d_%m_%Y_%H_%M_%S")
 
 opl = [ "*" , '+' , '-' , '/' ] # basic arithmetic operators.
 
-uopl= [ "square" , "cbrt" , 'neg' , 'cube',
-        'sqrt','inv','exp','log' ] # single input math operations.
+uopl = []
+
+# uopl= [ "square" , "cbrt" , 'neg' , 'cube',
+        # 'sqrt','inv','exp','log' ] # single input math operations.
+# uopl = [ 'square' ]
 
 variable_names = [ 'p' , 't' , 'Dp' ]
 
@@ -63,23 +66,47 @@ batching = True
 run_id = formatted_now
 
 print('Loading data from files:')
-print(f'{input_file} and {output_file}')
-print(f'Results will be saved to outputs/{run_id}')
+print(f'{input_file} and {output_file}\n')
+print(f'Results will be saved to outputs/{run_id}\n')
+
+#
+## Bookkeeping Scheme
+#
+
+with open ( 'targ_path.txt' , 'w' ) as f :
+    f.write ( f'outputs/{run_id}' )
+
+with open ( 'sr_parameters.txt' , 'w' ) as f :
+    f.write ( f'input_file: {input_file}\n' )
+    f.write ( f'output_file: {output_file}\n' )
+    f.write ( f'niterations: {niterations}\n' )
+    f.write ( f'populations: {populations}\n' )
+    f.write ( f'population_size: {population_size}\n' )
+    f.write ( f'ncycles_per_iteration: {ncycles_per_iteration}\n' )
+    f.write ( f'batching: {batching}\n' )
+    f.write ( f'run_id: {run_id}\n' )
+    f.write ( f'Operators and functions: {opl} {uopl}' )
 
 #-------------------------------------------------------------------------------
 '                                LOADING DATA                                  '
 #-------------------------------------------------------------------------------
 
 inp_df = pd.read_csv(input_file,skiprows=0,sep=' ')
+
 with open(input_file, 'r') as file:
+
     first_line = file.readline()
     first_line.replace('# ','')
+
 inp_df.columns = first_line.split()
 
 out_df = pd.read_csv(output_file,skiprows=0,sep=' ')
+
 with open(output_file, 'r') as file:
+
     first_line = file.readline()
     first_line.replace('# ','')
+
 out_df.columns = first_line.split()
 
 #-------------------------------------------------------------------------------
@@ -104,7 +131,7 @@ dlocal0 = out_df['Spin_Up_0'].to_numpy()
 '                            REGRESSOR INSTANCE                                '
 #-------------------------------------------------------------------------------
 
-print('Running PySR...')
+print('Running PySR...\n')
 
 model = srp.PySRRegressor ( binary_operators = opl , unary_operators = uopl ,
                             niterations = niterations ,batching = batching ,
