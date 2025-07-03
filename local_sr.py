@@ -52,16 +52,16 @@ opl = [ "*" , '+' , '-' , '/' ] # basic arithmetic operators.
 
 uopl = []
 
-# uopl= [ "square" , "cbrt" , 'neg' , 'cube',
-        # 'sqrt','inv','exp','log' ] # single input math operations.
+uopl= [ "square" , "cbrt" , 'neg' , 'cube',
+         'sqrt','inv','exp','log' ] # single input math operations.
 # uopl = [ 'square' ]
 
-variable_names = [ 'p' , 't' , 'Dp' ]
+variable_names = [ 'p' , 't' , 'DP', 'so' ]
 
-niterations = int ( 1e2 ) 
-populations = 31
+niterations = int ( 1e3 ) 
+populations = 384
 population_size = 27
-ncycles_per_iteration = 380
+ncycles_per_iteration = 1000
 batching = True
 run_id = formatted_now
 
@@ -91,14 +91,14 @@ with open ( 'sr_parameters.txt' , 'w' ) as f :
 '                                LOADING DATA                                  '
 #-------------------------------------------------------------------------------
 
-inp_df = pd.read_csv(input_file,skiprows=0,sep=' ')
+inp_df = pd.read_csv(input_file,sep=' ')
 
-with open(input_file, 'r') as file:
+#with open(input_file, 'r') as file:
 
-    first_line = file.readline()
-    first_line.replace('# ','')
+#    first_line = file.readline()
+#    first_line.replace('# ','')
 
-inp_df.columns = first_line.split()
+#inp_df.columns = first_line.split()
 
 out_df = pd.read_csv(output_file,skiprows=0,sep=' ')
 
@@ -123,10 +123,16 @@ drhosz0 = inp_df['drhosz'].to_numpy()
 
 drhos2 = drhosx0**2 + drhosy0**2 + drhosz0**2
 
-fl = np.column_stack ( ( rho0 , tau0 , drhos2 ) ) # list of features.
+sodensx0 = inp_df['sodensx0'].to_numpy()
+sodensy0 = inp_df['sodensy0'].to_numpy()
+sodensz0 = inp_df['sodensz0'].to_numpy()
 
-dlocal0 = out_df['Spin_Up_0'].to_numpy()
+sodens2 = sodensx0**2 + sodensy0**2 + sodensz0**2
 
+fl = np.column_stack ( ( rho0 , tau0 , drhos2, sodens2 ) ) # list of features.
+print(fl[0:3,:])
+dlocal0 = out_df['secret'].to_numpy()
+print(dlocal0[0:3])
 #-------------------------------------------------------------------------------
 '                            REGRESSOR INSTANCE                                '
 #-------------------------------------------------------------------------------

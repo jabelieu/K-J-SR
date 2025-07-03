@@ -1,1 +1,1 @@
-outputs/10_04_2025_13_55_51
+outputs/rhochrg_3nuclei_13_06_2025_13_33_19

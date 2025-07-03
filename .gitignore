@@ -1,8 +1,8 @@
-rlambda.dat
-outputs
-rlambda_48X48Y48Z.dat
-dlocal_48X48Y48Z.dat
-clocal_48X48Y48Z.dat
-rlambda_48X48Y48Z.txt
-dlocal_48X48Y48Z.txt
-clocal_48X48Y48Z.txt
+*
+
+!general_symbolic_regressor.py
+!.gitignore
+!env.sh
+!proto_plotter.py
+!*.20
+!*_j3_quants.txt
