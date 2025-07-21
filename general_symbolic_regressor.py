@@ -43,12 +43,12 @@ A unique identifier for the run. Will be generated using the current date and ti
 Default: None
 '''
 
-# feature_file = 'j3_quants.txt'
-# target_file = 'fort.20'
+beefy_settings_flag = int ( 0 )
+light_settings_flag = int ( 1 - beefy_settings_flag )
 
 nuclei_list = ['ca40','ca44', 'ca48','sn100','sn132','pb208', 'pb266']
 
-custom_run_tag = 'pc_7nucl'
+custom_run_tag = 'pc_7nucl_constsback'
 
 now = datetime.datetime.now()
 formatted_now = now.strftime("%d_%m_%Y_%H_%M_%S")
@@ -59,36 +59,24 @@ uopl= [ "square" , "cbrt" , 'neg' , 'cube', 'sqrt','inv']
 
 variable_names = [ 'rp','rn','tp','tn','ssp','ssn','sp','sn' ]
 
-niterations = int ( 2e4 ) 
-populations = 501
-population_size = int ( 1e2 )
-ncycles_per_iteration = int ( 1e3 )
-complexity_of_constants = int ( 2e1 )
+complexity_of_constants = int ( 1e0 )
 batching = False
 run_id = custom_run_tag + '_' + formatted_now
 
+if beefy_settings_flag == 1 :
 
-# print('Loading data from file(s) :')
-# print(f'{feature_file}')
-# print(f'Results will be saved to outputs/{run_id}\n')
+    niterations = int ( 2e4 ) 
+    populations = 501
+    population_size = int ( 1e2 )
+    ncycles_per_iteration = int ( 1e3 )
+    
 
-# #
-# ## Bookkeeping Scheme
-# #
+elif light_settings_flag == 1 :
 
-# with open ( 'targ_path.txt' , 'w' ) as f :
-#     f.write ( f'outputs/{run_id}' )
-
-# with open ( 'sr_parameters.txt' , 'w' ) as f :
-#     f.write ( f'input_file: {feature_file}\n' )
-#     f.write ( f'output_path: {run_id}\n' )
-#     f.write ( f'niterations: {niterations}\n' )
-#     f.write ( f'populations: {populations}\n' )
-#     f.write ( f'population_size: {population_size}\n' )
-#     f.write ( f'ncycles_per_iteration: {ncycles_per_iteration}\n' )
-#     f.write ( f'batching: {batching}\n' )
-#     f.write ( f'run_id: {run_id}\n' )
-#     f.write ( f'Operators and functions: {opl} {uopl}' )
+    niterations = int ( 1e3 ) 
+    populations = 50
+    population_size = int ( 1e2 )
+    ncycles_per_iteration = int ( 1e3 )
 
 #-------------------------------------------------------------------------------
 '                                LOADING DATA                                  '

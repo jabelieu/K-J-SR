@@ -3,11 +3,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import simpson
 import sympy as syp
+from matplotlib.colors import Normalize
+import matplotlib.cm as cm
+import matplotlib.patheffects as path_effects
 
 max_eq = 4
 min_alpha = 0.2
 
-table_print_flag = 1 # 1 = on , 0 = off
+table_print_flag = 0 # 1 = on , 0 = off
 
 selector = 'score'
 
@@ -21,9 +24,17 @@ if len ( valid_list ) != 0 :
     nuclei_list += valid_list
 
 path_id = '/mnt/home/belieujo/projects/K-J-SR/outputs/pc_7nucl_28_06_2025_16_44_14'
+plot_identifier = '7nucl_valid' # gets added to plot savenames
+"""
+path_id archive : 
 
-dens_plot_flag = 1 # on = 1 , off = 0
-dens_plot_save_flag = 1
+The 7nucl that we also did a validation test and took to witek!
+'/mnt/home/belieujo/projects/K-J-SR/outputs/pc_7nucl_28_06_2025_16_44_14'
+
+"""
+
+dens_plot_flag = 0 # on = 1 , off = 0
+dens_plot_save_flag = 0
 plot_save_name = '7nucl_validation_' + selector + '.png'
 
 def table_printer ( column_lists , column_headers , formatters ) :
@@ -124,14 +135,106 @@ def rmsr ( r , density ) :
 
     return np.sqrt(radius)
 
+def plot_nuclear_property_grid(nuclei, values, title=None, cmap=None, norm=None, ax=None):
+    """
+    Plot one grid of nucleus names, colored by values, inside a given Axes object.
+    """
+    nuclei = np.array(nuclei)
+    values = np.array(values)
+
+    num_nuclei = len(nuclei)
+    cols = int(np.ceil(np.sqrt(num_nuclei)))
+    rows = int(np.ceil(num_nuclei / cols))
+
+    # Create figure if no axis provided
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(cols, rows))
+
+    # Create color mapping if not provided
+    if cmap is None:
+        cmap = cm.get_cmap("viridis")
+    if norm is None:
+        norm = Normalize(vmin=np.nanmin(values), vmax=np.nanmax(values))
+
+    # Draw grid
+    for idx, (name, value) in enumerate(zip(nuclei, values)):
+        if name in valid_list :
+            name += '*'
+        row = idx // cols
+        col = idx % cols
+        color = cmap(norm(value))
+
+        rect = plt.Rectangle((col, rows - row - 1), 1, 1, facecolor=color, edgecolor='black')
+        ax.add_patch(rect)
+
+        text = ax.text(
+            col + 0.5, rows - row - 0.5, name,
+            ha='center', va='center', fontsize=10,
+            color='white'
+        )
+        text.set_path_effects([
+            path_effects.Stroke(linewidth=1.5, foreground='black'),
+            path_effects.Normal()
+        ])
+    ax.set_xlim(0, cols)
+    ax.set_ylim(0, rows)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_aspect('equal')
+    if title:
+        ax.set_title(title)
+
+def square_multiplot(nuclei, all_values, formula_names=None,property=None,save_name='bar_sqplot',cmap_name="viridis"):
+    """
+    Plot all predictions (from different formulas) side by side for comparison.
+
+    Parameters:
+        nuclei (list of str): List of nucleus names
+        all_values (list or array): Flat list of all values from all formulas (length = k * n)
+        formula_names (list of str): Optional list of names for each formula
+        cmap_name (str): Colormap name
+    """
+    nuclei = np.array(nuclei)
+    all_values = np.array(all_values)
+    n = len(nuclei)
+    k = all_values.size // n
+    if all_values.size % n != 0:
+        raise ValueError("Length of values must be a multiple of the number of nuclei")
+
+    values_matrix = all_values.reshape((k, n))
+    formula_names = formula_names or [f"Model {i+1}" for i in range(k)]
+
+    # Shared color scale
+    vmin = np.nanmin(all_values)
+    vmax = np.nanmax(all_values)
+    norm = Normalize(vmin=vmin, vmax=vmax)
+    cmap = plt.colormaps.get_cmap(cmap_name)
+
+    fig, axs = plt.subplots(1, k, figsize=(5*k, 6),constrained_layout=True)
+    if k == 1:
+        axs = [axs]  # force into list
+
+    for i in range(k):
+        plot_nuclear_property_grid(
+            nuclei, values_matrix[i],
+            title='Expression '+formula_names[i],
+            cmap=cmap,
+            norm=norm,
+            ax=axs[i]
+        )
+
+    # Add shared colorbar
+    sm = cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cbar = fig.colorbar(sm, ax=axs, orientation='vertical', fraction=0.025, pad=0.04)
+    if property != None :
+        fig.suptitle( property ,fontsize=16, y=0.9 )
+
+    # plt.tight_layout()
+    plt.savefig ( 'plots/' + save_name + '.png' )
+
 feature_file = 'ca48_j3_quants.txt'
 target_file = 'ca48_fort.20'
-
-target_charge_radius40 = 3.493268148170989
-target_charge_radius48 = 3.507005257178622
-target_charge_radius208 = 5.508300727077247
-
-master_hf_rc_list = [target_charge_radius40,target_charge_radius48,target_charge_radius208]
 
 '''
 r : distance in fm
@@ -225,6 +328,9 @@ model = pysr_instance.from_file(run_directory = path_id)
 df = model.equations_
 
 eq_sort = df.sort_values(selector)
+
+if selector == 'score' :
+    eq_sort = eq_sort[::-1]
 
 x_vals = mfl.flatten() if mfl.ndim == 2 else mfl  # make sure X is 1D
 
@@ -423,14 +529,37 @@ rmsd_rmsd_pcdiff = np.sqrt ( np.mean ( np.array(pcdiff_rmsd_ls) ** 2 ) )
 avg_pc_custloss = np.mean ( pc_custlss_ls )
 rmsd_pc_custloss = np.sqrt ( np.mean ( np.array(pc_custlss_ls) ** 2 ) ) 
 
-print(f'avg rc diff {avg_rc_diff:.3e}')
-print(f'rmsd rc diff {rmsd_rc_diff:.3e}')
-print(f'avg %err rc {avg_pe_rc:.3e}')
-print(f'rmsd %err rc {rmsd_pe_rc:.3e}')
-print(f'avg RMSD(pc diff) {avg_rmsd_pcdiff:.3e}')
-print(f'rmsd RMSD(pc diff) {rmsd_rmsd_pcdiff:.3e}')
-print(f'avg pc custLoss {avg_pc_custloss:.3e}')
-print(f'rmsd pc custLoss {rmsd_pc_custloss:.3e}')
+
+# print(len(nuclei_list),len(rc_pererr_ls))
+
+dist_eq_ls = list(dict.fromkeys(eqnumb_list))
+
+sq_plot_quants = [ rc_pererr_ls , pcdiff_rmsd_ls , pc_custlss_ls ]
+sq_plot_names = [ r'$r_c$ %Err' , r'$\delta\rho_{c,RMSD}$' , r'$\rho_{c,CL}$' ]
+sq_plot_savenames = [ 'rc_PerErr' , 'pc_rmsd_res' , 'pc_custlss' ]
+
+for quantity,title,savefile in zip(sq_plot_quants,sq_plot_names,sq_plot_savenames) :
+
+    if plot_identifier != None :
+        savefile += '_' + plot_identifier
+
+    square_multiplot(nuclei_list,quantity,dist_eq_ls,title,savefile)
+
+# for i in range ( numb_eq ) :
+
+#     sidx = i * len(nuclei_list)
+#     lidx = (i+1)*len(nuclei_list)
+    
+#     rc_pererr_ls[sidx,lidx]
+
+# print(f'avg rc diff {avg_rc_diff:.3e}')
+# print(f'rmsd rc diff {rmsd_rc_diff:.3e}')
+# print(f'avg %err rc {avg_pe_rc:.3e}')
+# print(f'rmsd %err rc {rmsd_pe_rc:.3e}')
+# print(f'avg RMSD(pc diff) {avg_rmsd_pcdiff:.3e}')
+# print(f'rmsd RMSD(pc diff) {rmsd_rmsd_pcdiff:.3e}')
+# print(f'avg pc custLoss {avg_pc_custloss:.3e}')
+# print(f'rmsd pc custLoss {rmsd_pc_custloss:.3e}')
 
 # print(model.latex_table(indices=None, precision=3, columns=['equation', 'complexity', 'loss', 'score']))
 

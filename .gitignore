@@ -6,3 +6,5 @@
 !proto_plotter.py
 !*.20
 !*_j3_quants.txt
+!outputs
+!results_plotter.py
