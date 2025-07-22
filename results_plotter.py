@@ -11,17 +11,21 @@
 Script Parameters
 """
 
-density_plot_flag = 0 # 0 = off, 1 = on
-nuclear_property_plot_flag = 0
+density_plot_flag = 1 # 0 = off, 1 = on
+nuclear_property_plot_flag = 1
 table_print_flag = 1
+scaler_flag = 1
 
-path_id = 'outputs/pc_7nucl_aggro_29_06_2025_15_33_08'
+run_name = 'wsq_5050_ss_10_07_2025_14_41_23'
+path_id = 'outputs/' + run_name
+targ_pkl = 'targss_' + run_name + '.pkl'
+fl_pkl = 'flss_' + run_name + '.pkl'
 
 nuclei_list = ['ca40','ca44', 'ca48','sn100','sn132','pb208', 'pb266']
 
 valid_list = []
-valid_list = [ 'ca38' , 'ca42' , 'ca46' , 'ca50' , 'ca54' , 'sn120' ,
-              'sn170' , 'ni56' , 'ni68' , 'pb196', 'o16' , 'o24' ]
+# valid_list = [ 'ca38' , 'ca42' , 'ca46' , 'ca50' , 'ca54' , 'sn120' ,
+#               'sn170' , 'ni56' , 'ni68' , 'pb196']#, 'o16' , 'o24' ]
 
 if valid_list != [] :
     nuclei_list += valid_list
@@ -41,17 +45,33 @@ import pysr as srp
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import simpson
-# import matplotlib.colormaps as mcm ###########
 # import sympy as syp
 from matplotlib.colors import Normalize
 import matplotlib.cm as cm
-import matplotlib.patheffects as path_effects
 import pickle
 import pandas as pd
 
 """
 Custom Functions
 """
+
+def signature () :
+
+    signature = r'''
+    Coded by:
+    --------
+      ________ ___       _______  _________  ________  ___  ___     
+     |\  _____\\  \     |\  ___ \|\___   ___\\   ____\|\  \|\  \    
+     \ \  \__/\ \  \    \ \   __/\|___ \  \_\ \  \___|\ \  \\\  \   
+      \ \   __\\ \  \    \ \  \_|/__  \ \  \ \ \  \    \ \   __  \  
+       \ \  \_| \ \  \____\ \  \_|\ \  \ \  \ \ \  \____\ \  \ \  \ 
+        \ \__\   \ \_______\ \_______\  \ \__\ \ \_______\ \__\ \__\
+         \|__|    \|_______|\|_______|   \|__|  \|_______|\|__|\|__|
+                '''
+
+    print ( signature + '\n' )
+
+    return 0
 
 def table_printer ( column_lists , column_headers , formatters ) :
 
@@ -272,6 +292,18 @@ def get_results ( path_id , nuclei_list ,selector = 'score' , max_eq = 3,) :
 
     target_data , fl = load_data ( nuclei_list )
 
+    if scaler_flag == 1 :
+
+        with open ( targ_pkl , 'rb' ) as f :
+            targ_scaler = pickle.load ( f )
+        with open ( fl_pkl , 'rb' ) as f :
+            fl_scaler = pickle.load ( f )
+
+        unscaled_rp = fl[:,0] # rho-proton
+
+        fl = fl_scaler.transform ( fl )
+
+
     pysr_instance = srp.PySRRegressor()
     model = pysr_instance.from_file(run_directory = path_id)
 
@@ -307,7 +339,11 @@ def get_results ( path_id , nuclei_list ,selector = 'score' , max_eq = 3,) :
         try :
 
                 y_pred = expr(fl)
-                # y_pred += fl[:,0] # rho-proton
+
+                if scaler_flag == 1 :
+
+                    y_pred = targ_scaler.inverse_transform(y_pred.reshape(-1, 1)).flatten()
+                    y_pred += unscaled_rp # rho-proton
 
         except :
             continue
@@ -326,11 +362,13 @@ def get_results ( path_id , nuclei_list ,selector = 'score' , max_eq = 3,) :
             pc_hf = target_data [ sidx : eidx ]
 
             # sr_z = 4*np.pi*simpson ( pc_sr * r ** 2 , r )
-        #     hf_z = 4*np.pi*simpson ( pc_hf * r ** 2 , r )
+            # hf_z = 4*np.pi*simpson ( pc_hf * r ** 2 , r )
 
-        #     N = hf_z / sr_z # TODO make normalization a parameter.
+            # N = hf_z / sr_z # TODO make normalization a parameter.
 
-        #     # y_pred[sidx:eidx] *= N
+            # y_pred[sidx:eidx] *= N
+            # pc_sr *= N
+
 
         #     pc_sr = y_pred [ sidx : eidx ]
         #     pc_hf = master_target_data [ sidx : eidx ]
@@ -547,6 +585,12 @@ def nuclear_property_plot(
 
     return 0
 
+"""
+Main Execution
+"""
+
+signature()
+
 x = get_results(path_id, nuclei_list)
 
 if density_plot_flag == 1 :
@@ -579,10 +623,8 @@ if table_print_flag == 1 :
     ]
 
     tp_fmt = [
-    's', 'd','.3e' ,       # Strings for nucleus and equation number
-    '.3f', '.3f',    # 3 decimal floats for HF and SR rC
-    '.3e', '.2e',    # Scientific notation for rC diff, 2 decimal percent for error
-    '.3e', '.3e'     # Scientific for RMSD, and 3 decimal sci for loss
+    's', 'd','.3e' ,'.3f', '.3f',
+    '.3e', '.2e','.3e', '.3e'    
     ]
 
     tp_data = [x[col].tolist() for col in tp_cols]
@@ -604,3 +646,7 @@ if table_print_flag == 1 :
 'loss' : loss_ls,
 'score' : score_ls
 '''
+
+#------------------------------------------------------------------------------
+#                               END PROGRAM
+#==============================================================================
