@@ -52,21 +52,22 @@ A unique identifier for the run. Will be generated using the current date and ti
 Default: None
 '''
 
+scaler_flag = 0  # 1 for scaling, 0 for no scaling.
 beefy_settings_flag = int ( 0 )
 light_settings_flag = int ( 1 - beefy_settings_flag )
 
 nuclei_list = ['ca40','ca44', 'ca48','sn100','sn132','pb208', 'pb266']
 
-custom_run_tag = 'wsq_5050_ss'
+custom_run_tag = 'res_noSS'
 
 now = datetime.datetime.now()
 formatted_now = now.strftime("%d_%m_%Y_%H_%M_%S")
 
 opl = [ "*" , '+' , '-' , '/' ] # basic arithmetic operators.
 
-uopl= [ "square" , "cbrt" , 'neg' , 'cube', 'sqrt','inv']
+uopl= [ "square" , "cbrt" , 'neg' , 'cube', 'sqrt','inv','exp']
 
-variable_names = [ 'rp','rn','tp','tn','ssp','ssn','sp','sn' ]
+variable_names = [ 'rp','rn','ssp','ssn','sp','sn','ptp','ptn' ]
 
 complexity_of_constants = int ( 1e0 )
 batching = False
@@ -75,17 +76,17 @@ run_id = custom_run_tag + '_' + formatted_now
 if beefy_settings_flag == 1 :
 
     niterations = int ( 2e4 ) 
-    populations = 501
+    populations = 300
     population_size = int ( 1e2 )
     ncycles_per_iteration = int ( 1e3 )
     
 
 elif light_settings_flag == 1 :
 
-    niterations = int ( 1e3 ) 
-    populations = 501
-    population_size = int ( 1e2 )
-    ncycles_per_iteration = int ( 1e3 )
+    niterations = int ( 1e4 ) 
+    populations = 100
+    population_size = int ( 1e3 )
+    ncycles_per_iteration = int ( 2e3 )
 
 #-------------------------------------------------------------------------------
 '                                LOADING DATA                                  '
@@ -100,6 +101,8 @@ master_ssp = np.array([])
 master_ssn = np.array([])
 master_sp = np.array([])
 master_sn = np.array([])
+master_ptp = np.array([])
+master_ptn = np.array([])
 
 master_target_data = np.array([])
 
@@ -134,6 +137,9 @@ for nuclei in nuclei_list :
     sp = raw_feature_data [:,7]
     sn = raw_feature_data [:,8]
 
+    ptp = rp * tp
+    ptn = rn * tn
+
     # Append to master arrays
     master_r = np.append(master_r, r)
     master_rp = np.append(master_rp, rp)
@@ -144,6 +150,8 @@ for nuclei in nuclei_list :
     master_ssn = np.append(master_ssn, ssn)
     master_sp = np.append(master_sp, sp)
     master_sn = np.append(master_sn, sn)
+    master_ptp = np.append(master_ptp, ptp)
+    master_ptn = np.append(master_ptn, ptn)
 
     with open ( target_file , 'r' ) as f :
         lines = f.readlines()
@@ -161,44 +169,28 @@ for nuclei in nuclei_list :
 master_target_data *= -1
 master_target_data += master_rp
 
-fl = np.column_stack ( ( master_rp, master_rn, master_tp, master_tn,
-                        master_ssp, master_ssn, master_sp, master_sn ) ) # list of features.
+fl = np.column_stack ( ( master_rp, master_rn,master_ssp, master_ssn,
+                          master_sp, master_sn,master_ptp,master_ptn ) ) # list of features.
 
-#
-## Custom Loss Function
-#
+if scaler_flag == 1 :
 
-fl_scaler = StandardScaler()
-fl_scaled = fl_scaler.fit_transform(fl)
+    fl_scaler = StandardScaler()
+    fl = fl_scaler.fit_transform(fl)
 
-fl_scale = to_jl_arr(fl_scaler.scale_)
-fl_mean = to_jl_arr(fl_scaler.mean_)
+    reshaped_master_target_data = master_target_data.reshape(-1,1) # reshape req. by scikit.
+    targ_scaler = StandardScaler()
+    master_target_data = targ_scaler.fit_transform(reshaped_master_target_data).ravel() # .ravel() returns OG shape.
 
-reshaped_master_target_data = master_target_data.reshape(-1,1) # reshape req. by scikit.
-targ_scaler = StandardScaler()
-targ_scaled = targ_scaler.fit_transform(reshaped_master_target_data).ravel() # .ravel() returns OG shape.
+    with open( 'pkl_storage/flss_'+run_id+'.pkl' , "wb") as f:
+        pickle.dump(fl_scaler, f)
 
-targ_scale = targ_scaler.scale_[0] 
-targ_mean = targ_scaler.mean_[0]
-
-with open( 'flss_'+run_id+'.pkl' , "wb") as f:
-    pickle.dump(fl_scaler, f)
-
-with open('targss_'+run_id+'.pkl', "wb") as f:
-    pickle.dump(targ_scaler, f)
+    with open('pkl_storage/targss_'+run_id+'.pkl', "wb") as f:
+        pickle.dump(targ_scaler, f)
 
 pre_objective = """
 function default_objective(tree, dataset::Dataset{T,L}, options)::L where {T,L}
     (prediction, completion) = eval_tree_array(tree, dataset.X, options)
     @assert length(prediction) % 71 == 0 "Prediction length must be divisible by 71 (got $(length(prediction)))"
-
-    # open("dataset_X_dump.txt", "w") do io
-    #     for row in eachrow(dataset.X)
-    #         println(io, join(row, ","))
-    #     end
-    # end
-
-    # exit(0)
 
     if !completion
         return L(Inf)
@@ -214,6 +206,19 @@ function default_objective(tree, dataset::Dataset{T,L}, options)::L where {T,L}
         return (h / 3) * (y[1] + 4 * odd_sum + 2 * even_sum + y[end])
     end
 
+    function msr(density::AbstractVector, r::AbstractVector, h::Float64)
+
+        num = simpsons_integrate(density .* r .^ 4, h)
+        denom = simpsons_integrate(density .* r .^ 2, h)
+
+        # if denom == 0
+        #     return Inf
+        # end
+
+        msr = num / denom
+        return msr
+    end
+
     wc1 = 0.5 # rc weight
     wc2 = 0.5 # pc weight
 
@@ -223,19 +228,11 @@ function default_objective(tree, dataset::Dataset{T,L}, options)::L where {T,L}
     n = {{STAND-IN}}
     r = a:h:b
 
-    fl_std = {{FL-STD}}
-    fl_mean = {{FL-MEAN}}
-    targ_std = {{TARG-STD}}
-    targ_mean = {{TARG-MEAN}}
+    # unscaled_rp = unscaled_datasetX'[1,:]
+    rp = dataset.X[1,:]
 
-    # unscaled_datasetX = dataset.X' .* fl_std .+ fl_mean
-    unscaled_datasetX = dataset.X' .* reshape(fl_std, 1, :) .+ reshape(fl_mean, 1, :)
-    unscaled_targ = dataset.y .* targ_std .+ targ_mean
-    unscaled_pred = prediction .* targ_std .+ targ_mean
-    unscaled_rp = unscaled_datasetX'[1,:]
-
-    pc_pred = unscaled_rp .- unscaled_pred
-    pc_targ = unscaled_rp .- unscaled_targ
+    pc_pred = rp .- prediction
+    pc_targ = rp .- dataset.y
 
     numb_nucl = Int(length( prediction ) / n)
 
@@ -250,10 +247,8 @@ function default_objective(tree, dataset::Dataset{T,L}, options)::L where {T,L}
         dens_slice = pc_pred[start_idx:end_idx]
         targ_slice = pc_targ[start_idx:end_idx]
 
-        # Simpson's rule: ∫f(x) dx ≈ h/3 [f₀ + 4f₁ + 2f₂ + ... + fₙ]
         dens_num = r .^ 4 .* dens_slice
         dens_denom = r .^ 2 .* dens_slice
-
         targ_num = r .^ 4 .* targ_slice
         targ_denom = r .^ 2 .* targ_slice
 
@@ -263,13 +258,17 @@ function default_objective(tree, dataset::Dataset{T,L}, options)::L where {T,L}
         int_targ_denom = simpsons_integrate(targ_denom, h)
 
         if int_dens_denom == 0 || int_targ_denom == 0
-            return L(Inf)  # or 1e6, or something large
+            return L(Inf)
         end
 
-        predicted_sqcharge_radius = int_dens_num / int_dens_denom
-        target_sqcharge_radius = int_targ_num / int_targ_denom
+        pred_msr = int_dens_num / int_dens_denom
+        targ_msr = int_targ_num / int_targ_denom
 
-        rc2_diff = abs(  predicted_sqcharge_radius - target_sqcharge_radius )/ target_sqcharge_radius
+        # if pred_msr == Inf || targ_msr == Inf
+        #     return convert(L, Inf)
+        # end
+
+        rc2_diff = abs(  pred_msr - targ_msr )/ targ_msr
         push!(master_rc_diff, rc2_diff)
 
     end
@@ -284,10 +283,6 @@ end
 """
 ngrid = len ( r )
 objective = pre_objective.replace("{{STAND-IN}}", str(ngrid))
-objective = objective.replace( "{{FL-STD}}" , fl_scale )
-objective = objective.replace( "{{FL-MEAN}}" , fl_mean )
-objective = objective.replace( "{{TARG-STD}}" , str(targ_scale) )
-objective = objective.replace( "{{TARG-MEAN}}" , str(targ_mean) )
 
 #-------------------------------------------------------------------------------
 '                            REGRESSOR INSTANCE                                '
@@ -303,7 +298,7 @@ model = srp.PySRRegressor ( binary_operators = opl , unary_operators = uopl ,
                             run_id = run_id, loss_function= objective,
                             complexity_of_constants=complexity_of_constants)
 
-model.fit ( fl_scaled , targ_scaled , variable_names = variable_names)
+model.fit ( fl , master_target_data , variable_names = variable_names)
 
 '''
 Find below v1 of an acceptable iteration of the custom loss function Kyle and I wrote.

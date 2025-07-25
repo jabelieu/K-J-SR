@@ -14,18 +14,26 @@ Script Parameters
 density_plot_flag = 1 # 0 = off, 1 = on
 nuclear_property_plot_flag = 1
 table_print_flag = 1
-scaler_flag = 1
+scaler_flag = 0
 
-run_name = 'wsq_5050_ss_10_07_2025_14_41_23'
+# run_name = 'res_ss_witremov_22_07_2025_18_26_58'
+# run_name = 'res_corrcoe_ss_22_07_2025_18_32_37'
+# run_name = 'res_ss_22_07_2025_15_28_25'
+# run_name = 'res_minfl_24_07_2025_13_09_44'
+# run_name = 'res_mid1fl_24_07_2025_13_19_56'
+# run_name = 'res_mid2fl_24_07_2025_13_27_37'
+# run_name = 'res_maxfl_24_07_2025_13_35_27'
+run_name = 'res_noSS_24_07_2025_14_27_42'
+
 path_id = 'outputs/' + run_name
-targ_pkl = 'targss_' + run_name + '.pkl'
-fl_pkl = 'flss_' + run_name + '.pkl'
+targ_pkl = 'pkl_storage/targss_' + run_name + '.pkl'
+fl_pkl = 'pkl_storage/flss_' + run_name + '.pkl'
 
 nuclei_list = ['ca40','ca44', 'ca48','sn100','sn132','pb208', 'pb266']
 
 valid_list = []
-# valid_list = [ 'ca38' , 'ca42' , 'ca46' , 'ca50' , 'ca54' , 'sn120' ,
-#               'sn170' , 'ni56' , 'ni68' , 'pb196']#, 'o16' , 'o24' ]
+valid_list = [ 'ca38' , 'ca42' , 'ca46' , 'ca50' , 'ca54' , 'sn120' ,
+              'sn170' , 'ni56' , 'ni68' , 'pb196']#, 'o16' , 'o24' ]
 
 if valid_list != [] :
     nuclei_list += valid_list
@@ -213,6 +221,8 @@ def load_data ( nuclei_list ) :
     master_ssn = np.array([])
     master_sp = np.array([])
     master_sn = np.array([])
+    master_ptp = np.array([])
+    master_ptn = np.array([])
 
     master_target_data = np.array([])
 
@@ -238,6 +248,9 @@ def load_data ( nuclei_list ) :
         sp = raw_feature_data [:,7]
         sn = raw_feature_data [:,8]
 
+        ptp = rp * tp
+        ptn = rn * tn
+
         master_r = np.append(master_r, r)
         master_rp = np.append(master_rp, rp)
         master_rn = np.append(master_rn, rn)
@@ -247,6 +260,8 @@ def load_data ( nuclei_list ) :
         master_ssn = np.append(master_ssn, ssn)
         master_sp = np.append(master_sp, sp)
         master_sn = np.append(master_sn, sn)
+        master_ptp = np.append(master_ptp, ptp)
+        master_ptn = np.append(master_ptn, ptn)
 
         with open ( target_file , 'r' ) as f :
             lines = f.readlines()
@@ -268,8 +283,8 @@ def load_data ( nuclei_list ) :
     is formatted as such for the PySR rergression algorithm.
     '''
 
-    mfl = np.column_stack ( ( master_rp, master_rn, master_tp, master_tn,
-                            master_ssp, master_ssn, master_sp, master_sn ) )
+    mfl = np.column_stack ( ( master_rp, master_rn, master_ssp, master_ssn, 
+                             master_sp, master_sn, master_ptp,master_ptn ) )
     
     return master_target_data , mfl
 
@@ -292,6 +307,10 @@ def get_results ( path_id , nuclei_list ,selector = 'score' , max_eq = 3,) :
 
     target_data , fl = load_data ( nuclei_list )
 
+    # fl = np.delete ( fl , [2,3] , axis = 1 )
+    # fl = fl[:,:6]
+
+
     if scaler_flag == 1 :
 
         with open ( targ_pkl , 'rb' ) as f :
@@ -302,6 +321,7 @@ def get_results ( path_id , nuclei_list ,selector = 'score' , max_eq = 3,) :
         unscaled_rp = fl[:,0] # rho-proton
 
         fl = fl_scaler.transform ( fl )
+        # fl = np.delete ( fl , [2,3,5] , axis = 1 )
 
 
     pysr_instance = srp.PySRRegressor()
@@ -343,7 +363,11 @@ def get_results ( path_id , nuclei_list ,selector = 'score' , max_eq = 3,) :
                 if scaler_flag == 1 :
 
                     y_pred = targ_scaler.inverse_transform(y_pred.reshape(-1, 1)).flatten()
-                    y_pred += unscaled_rp # rho-proton
+                    y_pred = unscaled_rp - y_pred # rho-proton
+
+                else : 
+
+                    y_pred = fl[:,0] - y_pred
 
         except :
             continue
@@ -419,7 +443,7 @@ def get_results ( path_id , nuclei_list ,selector = 'score' , max_eq = 3,) :
 
     return res_df
 
-def density_plot ( df , save_name = 'density_plot_bar' , colormap_name = 'viridis' ) :
+def density_plot ( df , save_name = 'densplot_' + run_name , colormap_name = 'viridis' ) :
 
     unique_nuclei = df['nucleus'].unique()
     cmap =  plt.get_cmap(colormap_name).resampled(len(unique_nuclei))
@@ -442,7 +466,7 @@ def density_plot ( df , save_name = 'density_plot_bar' , colormap_name = 'viridi
         for i, comp in enumerate(unique_complexities)
     }
 
-    fig, axs = plt.subplots ( 1 , 2 , figsize = ( 12 , 6 ) )
+    fig, axs = plt.subplots ( 2 , 2 , figsize = ( 10 , 8) )
 
     for i , row in df.iterrows():
 
@@ -458,17 +482,27 @@ def density_plot ( df , save_name = 'density_plot_bar' , colormap_name = 'viridi
         seen_complexities.add(complexity)
         linestyle = style_dict[complexity]
         alpha = loss_alpha(loss)
-        ax1, ax2 = axs
+
+        if nucleus in valid_list :
+            ax1, ax2 = axs[1]
+        else :
+            ax1, ax2 = axs[0]
 
         ax1.plot(r, row['sr_func_arr'],color=color,label=label,linestyle=linestyle,alpha=alpha)
         ax1.set_xlabel('r [ fm ]')
-        ax1.set_ylabel(r'$\rho$ [ fm$^-3$ ] ')
+        ax1.set_ylabel(r'$\rho_c^{SR}$ [ fm$^-3$ ] ')
 
         ax2.plot(r, row['pc_diff'],color=color,linestyle=linestyle,label=label2,alpha=alpha)
         ax2.set_xlabel('r [ fm ]')
-        ax2.set_ylabel(r'$\rho$ [ fm$^-3$ ] ')
+        ax2.set_ylabel(r'$\rho_c^{SR}-\rho_c^{HF}$ [ fm$^-3$ ] ')
 
     for nucleus in df['nucleus'].unique():
+
+        if nucleus in valid_list :
+            ax1, ax2 = axs[1]
+        else :
+            ax1, ax2 = axs[0]
+
         hf_row = df[df['nucleus'] == nucleus].iloc[0]  # just one example per nucleus
         ax1.plot(
         r,
@@ -481,15 +515,16 @@ def density_plot ( df , save_name = 'density_plot_bar' , colormap_name = 'viridi
     )
 
 
-    for ax in axs:
+    for col in axs:
+        for ax in col:
 
-        handles, labels = ax.get_legend_handles_labels()
-        for h in handles:
-            h.set_alpha(1.0)  # override transparency in legend
-
-        ax.legend()
-        ax.grid(ls='--', alpha=0.5)
-        ax.set_xlim(0, 10)
+            handles, labels = ax.get_legend_handles_labels()
+            for h in handles:
+                h.set_alpha(1.0)  # override transparency in legend
+            
+            ax.legend()
+            ax.grid(ls='--', alpha=0.5)
+            ax.set_xlim(0, 10)
 
     plt.tight_layout()
     plt.savefig( 'plots/' + save_name + '.png' , dpi = 300 )
@@ -531,12 +566,15 @@ def nuclear_property_plot(
 
     # Get global norm for the property over whole df
     prop_values_all = df[property_col].values
-    norm = Normalize(vmin=np.nanmin(prop_values_all), vmax=np.nanmax(prop_values_all))
+    # norm = Normalize(vmin=np.nanmin(prop_values_all), vmax=np.nanmax(prop_values_all))
 
     for ax, comp in zip(axs, complexities):
         sub_df = df[df[complexity_col] == comp]
         nuclei = sub_df[nucleus_col].values
         values = sub_df[property_col].values
+
+        # NEW: Normalize per subplot
+        norm = Normalize(vmin=np.nanmin(values), vmax=np.nanmax(values))
 
         num_nuclei = len(nuclei)
         cols = int(np.ceil(np.sqrt(num_nuclei)))
@@ -544,17 +582,14 @@ def nuclear_property_plot(
 
         # Draw grid squares
         for idx, (name, value) in enumerate(zip(nuclei, values)):
-            if name in valid_list:
-                name_display = name + '*'
-            else:
-                name_display = name
+            name_display = name + '*' if name in valid_list else name
 
             row = idx // cols
             col = idx % cols
             color = cmap(norm(value))
 
             rect = plt.Rectangle((col, rows - row - 1), 1, 1,
-                                 facecolor=color, edgecolor='black')
+                                facecolor=color, edgecolor='black')
             ax.add_patch(rect)
 
             text_color = get_contrast_text_color(color)
@@ -572,7 +607,7 @@ def nuclear_property_plot(
         ax.set_aspect('equal')
         ax.set_title(f'Complexity {comp}')
 
-        # Colorbar for this subplot
+        # Individual colorbar
         sm = cm.ScalarMappable(cmap=cmap, norm=norm)
         sm.set_array([])
         fig.colorbar(sm, ax=ax, orientation='vertical', fraction=0.046, pad=0.04)
@@ -606,7 +641,7 @@ if nuclear_property_plot_flag == 1 :
             complexity_col='complexity',
             nucleus_col='nucleus',
             property_title=title,
-            save_name=prop + '_grid',
+            save_name=prop+'_'+run_name,
             cmap_name='viridis'
         )
 
